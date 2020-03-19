@@ -607,7 +607,7 @@ using ArchRegExpMacroAssembler = RegExpMacroAssemblerARM;
 using ArchRegExpMacroAssembler = RegExpMacroAssemblerARM64;
 #elif V8_TARGET_ARCH_S390
 using ArchRegExpMacroAssembler = RegExpMacroAssemblerS390;
-#elif V8_TARGET_ARCH_PPC
+#elif V8_TARGET_ARCH_PPC || V8_TARGET_ARCH_PPC64
 using ArchRegExpMacroAssembler = RegExpMacroAssemblerPPC;
 #elif V8_TARGET_ARCH_MIPS
 using ArchRegExpMacroAssembler = RegExpMacroAssemblerMIPS;
@@ -721,9 +721,9 @@ TEST(MacroAssemblerNativeSimple) {
   m.AdvanceCurrentPosition(3);
   m.PushBacktrack(&backtrack);
   m.Succeed();
-  m.Bind(&backtrack);
+  m.BindJumpTarget(&backtrack);
   m.Backtrack();
-  m.Bind(&fail);
+  m.BindJumpTarget(&fail);
   m.Fail();
 
   Handle<String> source = factory->NewStringFromStaticChars("^foo");
@@ -780,9 +780,9 @@ TEST(MacroAssemblerNativeSimpleUC16) {
   m.AdvanceCurrentPosition(3);
   m.PushBacktrack(&backtrack);
   m.Succeed();
-  m.Bind(&backtrack);
+  m.BindJumpTarget(&backtrack);
   m.Backtrack();
-  m.Bind(&fail);
+  m.BindJumpTarget(&fail);
   m.Fail();
 
   Handle<String> source = factory->NewStringFromStaticChars("^foo");
@@ -835,11 +835,11 @@ TEST(MacroAssemblerNativeBacktrack) {
   Label backtrack;
   m.LoadCurrentCharacter(10, &fail);
   m.Succeed();
-  m.Bind(&fail);
+  m.BindJumpTarget(&fail);
   m.PushBacktrack(&backtrack);
   m.LoadCurrentCharacter(10, nullptr);
   m.Succeed();
-  m.Bind(&backtrack);
+  m.BindJumpTarget(&backtrack);
   m.Fail();
 
   Handle<String> source = factory->NewStringFromStaticChars("..........");
@@ -967,7 +967,7 @@ TEST(MacroAssemblernativeAtStart) {
   m.CheckNotAtStart(0, &not_at_start);
   // Check that prevchar = '\n' and current = 'f'.
   m.CheckCharacter('\n', &newline);
-  m.Bind(&fail);
+  m.BindJumpTarget(&fail);
   m.Fail();
   m.Bind(&newline);
   m.LoadCurrentCharacter(0, &fail);
@@ -1021,16 +1021,16 @@ TEST(MacroAssemblerNativeBackRefNoCase) {
   m.WriteCurrentPositionToRegister(2, 0);
   m.AdvanceCurrentPosition(3);
   m.WriteCurrentPositionToRegister(3, 0);
-  m.CheckNotBackReferenceIgnoreCase(2, false, false, &fail);  // Match "AbC".
-  m.CheckNotBackReferenceIgnoreCase(2, false, false, &fail);  // Match "ABC".
+  m.CheckNotBackReferenceIgnoreCase(2, false, &fail);  // Match "AbC".
+  m.CheckNotBackReferenceIgnoreCase(2, false, &fail);  // Match "ABC".
   Label expected_fail;
-  m.CheckNotBackReferenceIgnoreCase(2, false, false, &expected_fail);
-  m.Bind(&fail);
+  m.CheckNotBackReferenceIgnoreCase(2, false, &expected_fail);
+  m.BindJumpTarget(&fail);
   m.Fail();
 
   m.Bind(&expected_fail);
   m.AdvanceCurrentPosition(3);  // Skip "xYz"
-  m.CheckNotBackReferenceIgnoreCase(2, false, false, &succ);
+  m.CheckNotBackReferenceIgnoreCase(2, false, &succ);
   m.Fail();
 
   m.Bind(&succ);
@@ -1094,7 +1094,7 @@ TEST(MacroAssemblerNativeRegisters) {
   m.AdvanceCurrentPosition(2);
   m.PopCurrentPosition();
 
-  m.Bind(&backtrack);
+  m.BindJumpTarget(&backtrack);
   m.PopRegister(out1);
   m.ReadCurrentPositionFromRegister(out1);
   m.AdvanceCurrentPosition(3);
@@ -1131,7 +1131,7 @@ TEST(MacroAssemblerNativeRegisters) {
 
   m.Succeed();
 
-  m.Bind(&fail);
+  m.BindJumpTarget(&fail);
   m.Fail();
 
   Handle<String> source = factory->NewStringFromStaticChars("<loop test>");
@@ -1265,10 +1265,10 @@ TEST(MacroAssembler) {
   m.AdvanceCurrentPosition(3);
   m.PushBacktrack(&backtrack);
   m.Succeed();
-  m.Bind(&backtrack);
+  m.BindJumpTarget(&backtrack);
   m.ClearRegisters(2, 3);
   m.Backtrack();
-  m.Bind(&fail);
+  m.BindJumpTarget(&fail);
   m.PopRegister(0);
   m.Fail();
 

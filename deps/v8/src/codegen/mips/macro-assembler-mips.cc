@@ -4668,6 +4668,7 @@ void MacroAssembler::DecrementCounter(StatsCounter* counter, int value,
 // Debugging.
 
 void TurboAssembler::Trap() { stop(); }
+void TurboAssembler::DebugBreak() { stop(); }
 
 void TurboAssembler::Assert(Condition cc, AbortReason reason, Register rs,
                             Operand rt) {
@@ -5469,7 +5470,9 @@ void TurboAssembler::ResetSpeculationPoisonRegister() {
   li(kSpeculationPoisonRegister, -1);
 }
 
-void TurboAssembler::CallForDeoptimization(Address target, int deopt_id) {
+void TurboAssembler::CallForDeoptimization(Address target, int deopt_id,
+                                           Label* exit, DeoptimizeKind kind) {
+  USE(exit, kind);
   NoRootArrayScope no_root_array(this);
 
   // Save the deipt id in kRootRegister (we don't need the roots array from now

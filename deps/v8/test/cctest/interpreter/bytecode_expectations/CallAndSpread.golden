@@ -11,9 +11,8 @@ snippet: "
 "
 frame size: 3
 parameter count: 1
-bytecode array length: 25
+bytecode array length: 24
 bytecodes: [
-  /*   30 E> */ B(StackCheck),
   /*   34 S> */ B(LdaGlobal), U8(0), U8(0),
                 B(Star), R(1),
   /*   39 E> */ B(LdaNamedProperty), R(1), U8(1), U8(2),
@@ -38,9 +37,8 @@ snippet: "
 "
 frame size: 4
 parameter count: 1
-bytecode array length: 28
+bytecode array length: 27
 bytecodes: [
-  /*   30 E> */ B(StackCheck),
   /*   34 S> */ B(LdaGlobal), U8(0), U8(0),
                 B(Star), R(1),
   /*   39 E> */ B(LdaNamedProperty), R(1), U8(1), U8(2),
@@ -69,7 +67,6 @@ frame size: 8
 parameter count: 1
 bytecode array length: 101
 bytecodes: [
-  /*   30 E> */ B(StackCheck),
   /*   34 S> */ B(LdaGlobal), U8(0), U8(0),
                 B(Star), R(0),
                 B(LdaNamedProperty), R(0), U8(1), U8(2),
@@ -92,13 +89,14 @@ bytecodes: [
                 B(JumpIfJSReceiver), U8(7),
                 B(CallRuntime), U16(Runtime::kThrowIteratorResultNotAnObject), R(7), U8(1),
                 B(LdaNamedProperty), R(7), U8(6), U8(21),
-                B(JumpIfToBooleanTrue), U8(19),
+                B(JumpIfToBooleanTrue), U8(20),
                 B(LdaNamedProperty), R(7), U8(7), U8(12),
                 B(StaInArrayLiteral), R(4), R(3), U8(17),
                 B(Ldar), R(3),
                 B(Inc), U8(16),
                 B(Star), R(3),
-                B(JumpLoop), U8(33), I8(0),
+                B(StackCheck),
+                B(JumpLoop), U8(34), I8(0),
                 B(LdaSmi), I8(4),
                 B(StaInArrayLiteral), R(4), R(3), U8(17),
                 B(Mov), R(4), R(3),

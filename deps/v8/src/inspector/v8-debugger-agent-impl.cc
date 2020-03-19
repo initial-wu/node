@@ -6,10 +6,12 @@
 
 #include <algorithm>
 
+#include "../../third_party/inspector_protocol/crdtp/json.h"
 #include "src/base/safe_conversions.h"
 #include "src/debug/debug-interface.h"
 #include "src/inspector/injected-script.h"
 #include "src/inspector/inspected-context.h"
+#include "src/inspector/protocol/Debugger.h"
 #include "src/inspector/protocol/Protocol.h"
 #include "src/inspector/remote-object-id.h"
 #include "src/inspector/search-util.h"
@@ -1034,10 +1036,11 @@ Response V8DebuggerAgentImpl::pause() {
   return Response::OK();
 }
 
-Response V8DebuggerAgentImpl::resume() {
+Response V8DebuggerAgentImpl::resume(Maybe<bool> terminateOnResume) {
   if (!isPaused()) return Response::Error(kDebuggerNotPaused);
   m_session->releaseObjectGroup(kBacktraceObjectGroup);
-  m_debugger->continueProgram(m_session->contextGroupId());
+  m_debugger->continueProgram(m_session->contextGroupId(),
+                              terminateOnResume.fromMaybe(false));
   return Response::OK();
 }
 
@@ -1399,6 +1402,15 @@ bool V8DebuggerAgentImpl::isPaused() const {
   return m_debugger->isPausedInContextGroup(m_session->contextGroupId());
 }
 
+static String16 getScriptLanguage(const V8DebuggerScript& script) {
+  switch (script.getLanguage()) {
+    case V8DebuggerScript::Language::WebAssembly:
+      return protocol::Debugger::ScriptLanguageEnum::WebAssembly;
+    case V8DebuggerScript::Language::JavaScript:
+      return protocol::Debugger::ScriptLanguageEnum::JavaScript;
+  }
+}
+
 void V8DebuggerAgentImpl::didParseSource(
     std::unique_ptr<V8DebuggerScript> script, bool success) {
   v8::HandleScope handles(m_isolate);
@@ -1417,14 +1429,23 @@ void V8DebuggerAgentImpl::didParseSource(
   if (inspected) {
     // Script reused between different groups/sessions can have a stale
     // execution context id.
+    const String16& aux = inspected->auxData();
+    std::vector<uint8_t> cbor;
+    v8_crdtp::json::ConvertJSONToCBOR(
+        v8_crdtp::span<uint16_t>(aux.characters16(), aux.length()), &cbor);
     executionContextAuxData = protocol::DictionaryValue::cast(
-        protocol::StringUtil::parseJSON(inspected->auxData()));
+        protocol::Value::parseBinary(cbor.data(), cbor.size()));
   }
   bool isLiveEdit = script->isLiveEdit();
   bool hasSourceURLComment = script->hasSourceURLComment();
   bool isModule = script->isModule();
   String16 scriptId = script->scriptId();
   String16 scriptURL = script->sourceURL();
+  String16 scriptLanguage = getScriptLanguage(*script);
+  Maybe<int> codeOffset =
+      script->getLanguage() == V8DebuggerScript::Language::JavaScript
+          ? Maybe<int>()
+          : script->codeOffset();
 
   m_scripts[scriptId] = std::move(script);
   // Release the strong reference to get notified when debugger is the only
@@ -1460,7 +1481,8 @@ void V8DebuggerAgentImpl::didParseSource(
         scriptRef->endLine(), scriptRef->endColumn(), contextId,
         scriptRef->hash(), std::move(executionContextAuxDataParam),
         std::move(sourceMapURLParam), hasSourceURLParam, isModuleParam,
-        scriptRef->length(), std::move(stackTrace));
+        scriptRef->length(), std::move(stackTrace), std::move(codeOffset),
+        std::move(scriptLanguage));
     return;
   }
 
@@ -1471,14 +1493,16 @@ void V8DebuggerAgentImpl::didParseSource(
         scriptId, scriptURL, 0, 0, 0, 0, contextId, scriptRef->hash(),
         std::move(executionContextAuxDataParam), isLiveEditParam,
         std::move(sourceMapURLParam), hasSourceURLParam, isModuleParam, 0,
-        std::move(stackTrace));
+        std::move(stackTrace), std::move(codeOffset),
+        std::move(scriptLanguage));
   } else {
     m_frontend.scriptParsed(
         scriptId, scriptURL, scriptRef->startLine(), scriptRef->startColumn(),
         scriptRef->endLine(), scriptRef->endColumn(), contextId,
         scriptRef->hash(), std::move(executionContextAuxDataParam),
         isLiveEditParam, std::move(sourceMapURLParam), hasSourceURLParam,
-        isModuleParam, scriptRef->length(), std::move(stackTrace));
+        isModuleParam, scriptRef->length(), std::move(stackTrace),
+        std::move(codeOffset), std::move(scriptLanguage));
   }
 
   std::vector<protocol::DictionaryValue*> potentialBreakpoints;
@@ -1665,6 +1689,7 @@ void V8DebuggerAgentImpl::didPause(
 void V8DebuggerAgentImpl::didContinue() {
   clearBreakDetails();
   m_frontend.resumed();
+  m_frontend.flush();
 }
 
 void V8DebuggerAgentImpl::breakProgram(
